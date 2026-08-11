@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# quad — open (or reattach to) a 2x2 tmux session.
+# Put this on the REMOTE host at ~/bin/quad and chmod +x it.
+#
+#   quad            → session named "quad", panes start in $PWD
+#   quad logs       → session named "logs"
+#   quad logs /srv  → session named "logs", panes start in /srv
+
+set -euo pipefail
+
+SESSION="${1:-quad}"
+START_DIR="${2:-$PWD}"
+
+if tmux has-session -t "=$SESSION" 2>/dev/null; then
+  exec tmux attach-session -t "=$SESSION"
+fi
+
+# Three successive splits, then `tiled` normalises them into an even 2x2.
+# Doing it this way avoids hardcoding pane indexes, which differ depending on
+# whether the host sets pane-base-index.
+#
+# Note the trailing ":" on the targets. `-t "=name"` is a *session* target and
+# is correct for has-session/attach-session, but split-window and select-layout
+# want a pane/window target, where a bare "=name" is looked up as a pane name
+# and fails with "can't find pane". "=name:" means "current window of session
+# name", which is what we want.
+tmux new-session   -d -s "$SESSION" -c "$START_DIR"
+tmux split-window  -t "=$SESSION:" -c "$START_DIR"
+tmux split-window  -t "=$SESSION:" -c "$START_DIR"
+tmux split-window  -t "=$SESSION:" -c "$START_DIR"
+tmux select-layout -t "=$SESSION:" tiled
+# {top-left} rather than a literal 0, because pane-base-index may be 1.
+tmux select-pane   -t "=$SESSION:.{top-left}"
+
+exec tmux attach-session -t "=$SESSION"
