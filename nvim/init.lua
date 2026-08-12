@@ -286,6 +286,11 @@ require("lazy").setup({
         view = { width = 32 },
         renderer = { group_empty = true },
         actions = { open_file = { quit_on_open = false } },
+        -- nvim-tree hides git-ignored files by default, which buries exactly the
+        -- files you most need to hand-edit: .env, .dev.vars, anything holding
+        -- local secrets. Show them instead.
+        -- Toggle live with `I` (git-ignored) and `H` (dotfiles) inside the tree.
+        filters = { git_ignored = false },
       })
       map("n", "<C-b>", "<Cmd>NvimTreeToggle<CR>", { desc = "Toggle explorer" })
       map("n", "<C-S-e>", "<Cmd>NvimTreeFocus<CR>", { desc = "Focus explorer" })
