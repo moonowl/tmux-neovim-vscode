@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# phone — attach to a session from a small screen.
+#
+#   phone              → a scratch single-pane session called "phone"
+#   phone myproject    → attach to an existing session, zoomed to one pane
+#
+# Two things make an existing session usable on a phone:
+#
+#   attach -d   detaches other clients. tmux sizes a window to the client that
+#               used it last (window-size latest), but a forgotten desktop
+#               client still fights you; -d removes the argument entirely.
+#   resize-pane -Z   zooms the focused pane full-screen. A 2x2 on a 6" screen
+#               is unreadable. Ctrl+A z toggles it back, and unzooming here
+#               does not disturb the desktop layout when you return to it.
+
+set -euo pipefail
+
+SESSION="${1:-phone}"
+
+if tmux has-session -t "=$SESSION" 2>/dev/null; then
+  # Zoom only if the window has something to zoom out of.
+  panes=$(tmux list-panes -t "=$SESSION:" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$panes" -gt 1 ]; then
+    tmux resize-pane -Z -t "=$SESSION:" 2>/dev/null || true
+  fi
+  exec tmux attach-session -d -t "=$SESSION"
+fi
+
+# No such session — make a plain one-pane scratch.
+tmux new-session -d -s "$SESSION" -c "${2:-$HOME/dev}"
+exec tmux attach-session -d -t "=$SESSION"
