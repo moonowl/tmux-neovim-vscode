@@ -12,6 +12,14 @@ SESSION="${1:-quad}"
 START_DIR="${2:-$PWD}"
 
 if tmux has-session -t "=$SESSION" 2>/dev/null; then
+  # `phone` zooms a pane to fill a small screen, and zoom is session state that
+  # outlives the client that set it — so a session last used from a phone comes
+  # back as a single pane here. This is the grid entry point, so undo it.
+  # Guarded because resize-pane -Z toggles: firing it unconditionally would zoom
+  # a session that was already fine.
+  if [ "$(tmux display-message -p -t "=$SESSION:" '#{window_zoomed_flag}')" = "1" ]; then
+    tmux resize-pane -Z -t "=$SESSION:"
+  fi
   exec tmux attach-session -t "=$SESSION"
 fi
 
