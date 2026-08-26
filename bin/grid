@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+# grid — arrange a window's panes into an even N-column grid.
+#
+# tmux's built-in layouts cannot express "2 rows of 3": `tiled` picks its own
+# row/column split (3 rows of 2 for six panes), and even-horizontal puts them
+# all in one row. This builds the layout string directly.
+import subprocess, sys
+
+SESSION = sys.argv[1] if len(sys.argv) > 1 else ""
+COLS    = int(sys.argv[2]) if len(sys.argv) > 2 else 3
+target  = f"={SESSION}:" if SESSION else ""
+
+def tmux(*a):
+    return subprocess.run(["tmux", *a], capture_output=True, text=True).stdout.strip()
+
+args = ["-t", target] if target else []
+W, H = map(int, tmux("display-message", "-p", *args, "#{window_width}x#{window_height}").split("x"))
+ids  = tmux("list-panes", *args, "-F", "#{pane_id}").split()
+n    = len(ids)
+rows = (n + COLS - 1) // COLS
+
+def split(total, k):
+    # k cells plus (k-1) one-column separators, distributed as evenly as possible
+    avail = total - (k - 1)
+    base, extra = divmod(avail, k)
+    return [base + (1 if i < extra else 0) for i in range(k)]
+
+parts, y, i = [], 0, 0
+for h in split(H, rows):
+    k     = min(COLS, n - i)
+    x     = 0
+    cells = []
+    for w in split(W, k):
+        cells.append("%dx%d,%d,%d,%s" % (w, h, x, y, ids[i][1:]))
+        x += w + 1
+        i += 1
+    inner = ",".join(cells)
+    parts.append("%dx%d,0,%d{%s}" % (W, h, y, inner) if k > 1 else cells[0])
+    y += h + 1
+
+body = "%dx%d,0,0[%s]" % (W, H, ",".join(parts))
+
+# tmux validates a 16-bit checksum over the layout string
+c = 0
+for ch in body:
+    c = ((c >> 1) + ((c & 1) << 15)) & 0xffff
+    c = (c + ord(ch)) & 0xffff
+
+r = subprocess.run(["tmux", "select-layout", *args, "%04x,%s" % (c, body)],
+                   capture_output=True, text=True)
+print("grid: %d panes in %d rows x %d cols" % (n, rows, COLS) if r.returncode == 0
+      else "grid failed: " + r.stderr.strip())
